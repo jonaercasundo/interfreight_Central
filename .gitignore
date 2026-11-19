@@ -16,3 +16,4 @@ __pycache__/
 /storage/framework/sessions/*
 /storage/framework/views/*
 /storage/logs/*.log
+/.phpunit.result.cache
