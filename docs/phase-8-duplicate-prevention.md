@@ -1,0 +1,5 @@
+# Phase 8 Duplicate Prevention
+
+Invoice creation uses a transaction, source quotation/authorization row locks, and an internal year sequence row lock. A caller may pass an idempotency key; a repeated key returns the original draft only to its creator. Each line stores its source type/ID and authorization amount. Active drafts, submitted invoices, and approved invoices reserve their source balance. Rejected/canceled drafts release it. Issued-line sums reduce future available balances. Split/progress allocations are not exposed by the current interface.
+
+**Known dependency:** official issuance is currently fail-closed and is not implemented. Before enabling issuance, recheck the sum of issued allocations and active reservations under source locks, persist the immutable issued snapshot, and add the needed database allocation constraint/serialization strategy for the production DB. Concurrent issue tests must run against the target MySQL isolation/locking behavior before enabling this path.

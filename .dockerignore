@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+.git
+.pytest_cache
+.venv
+__pycache__
+node_modules
+vendor
+bootstrap/cache/*.php
+database/*.sqlite
+storage/logs
+storage/framework/cache
+storage/framework/sessions
+storage/framework/views
+storage/app/private
+public/hot

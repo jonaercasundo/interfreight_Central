@@ -1,0 +1,47 @@
+# Non-production overlay. Use with docker-compose.production.yml and staging-only
+# secrets/certificates; the explicit loopback ports keep this stack local.
+services:
+  app:
+    environment:
+      APP_ENV: staging
+      APP_DEBUG: "false"
+      IFC_CLAMAV_HOST: clamav
+      IFC_CLAMAV_PORT: "3310"
+    depends_on:
+      clamav: { condition: service_healthy }
+
+  queue:
+    environment:
+      APP_ENV: staging
+      APP_DEBUG: "false"
+      IFC_CLAMAV_HOST: clamav
+      IFC_CLAMAV_PORT: "3310"
+    depends_on:
+      clamav: { condition: service_healthy }
+
+  ai:
+    environment:
+      APP_ENV: staging
+
+  nginx:
+    ports: !override
+      - "127.0.0.1:${IFC_STAGING_HTTP_PORT:-18480}:80"
+      - "127.0.0.1:${IFC_STAGING_HTTPS_PORT:-18443}:443"
+
+  clamav:
+    image: clamav/clamav:stable
+    environment:
+      CLAMAV_NO_MILTERD: "true"
+      FRESHCLAM_CHECKS: "24"
+    volumes:
+      - ifc_staging_clamav_signatures:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      start_period: 6m
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  ifc_staging_clamav_signatures:

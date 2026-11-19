@@ -1,0 +1,3 @@
+# Phase 8 Tax and Numbering Configuration
+
+Quotation line tax treatment/rate/amount is copied from the accepted commercial line. Additional-charge tax classification remains unknown, so the draft total is not presented as final. There is no verified seller registration, jurisdiction setup, VAT/non-VAT policy, invoice series, or official number generator in this repository. Internal `BIL-YYYY-######` identifiers are explicitly distinct from statutory numbers. `IFC_BILLING_LEGAL_ISSUANCE_VERIFIED` defaults false; the issue operation remains closed even if toggled until an issuance provider and validated company settings exist. Do not enable the flag as a substitute for legal review.

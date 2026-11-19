@@ -1,0 +1,5 @@
+# Laravel–Python API Test Report
+
+Python FastAPI suite: `pytest python-ai/tests -q` — 15 passed. The local Laravel `/up` and FastAPI `/health` endpoints each returned HTTP 200. Laravel AI service client tests cover signed diagnostic calls, wrong credentials, unavailable service, missing config redaction, timeout/invalid response handling and safe health reporting. Executive tests cover authenticated prediction flow; Python tests exercise protected signed endpoint behavior and baseline forecasting/replay/validation per Phase 11 evidence.
+
+The Python suite emitted one upstream `StarletteDeprecationWarning` concerning `httpx` with `starlette.testclient`; tests still pass. `pip check` reports no broken requirements. No live Laravel-to-running-FastAPI integration test ran because live `AI_E2E_URL`/`AI_E2E_TOKEN` were not configured; two Laravel integration tests are expected to skip when those are absent. No adversarial prompt-injection, large payload stress, queue retry, production network/CORS, or real shipment-history model quality test was run. AI approvals and financial writes remain outside the implemented AI feature scope per Phase 11 report.

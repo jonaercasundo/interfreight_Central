@@ -1,0 +1,3 @@
+# Phase 11 AI Assistant
+
+The current general freight-help endpoint is not an executive reporting assistant: it does not query IFC metrics, cite source records, retain per-user history, or provide permission-scoped report answers. This change does not present it as one. A future deterministic reporting assistant can begin with allow-listed Laravel reporting functions for shipment counts, budgets, verified expenses, issued invoices, reconciled collections, and receivables. Each answer should state period, definition, data freshness, currency, and permitted source links. No generated SQL or unrestricted model access is acceptable.

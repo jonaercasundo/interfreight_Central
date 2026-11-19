@@ -1,0 +1,136 @@
+# Release template only. No deployment is performed by this repository configuration.
+# Supply secrets through the deployment platform; never commit a production .env file.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php-fpm.Dockerfile
+    environment: &app_environment
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${APP_KEY:?Provide APP_KEY through the deployment secret store}
+      APP_URL: ${APP_URL:?Provide the canonical HTTPS URL}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:?Provide the database name}
+      DB_USERNAME: ${DB_USERNAME:?Provide the database user}
+      DB_PASSWORD: ${DB_PASSWORD:?Provide the database password}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Provide a Redis password}
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: redis
+      FILESYSTEM_DISK: local
+      AI_SERVICE_URL: https://ai:8000
+      AI_SERVICE_VERIFY_TLS: "true"
+      AI_SERVICE_CA_BUNDLE: /run/ai-tls/ca.pem
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?Provide the internal AI credential}
+      AI_LARAVEL_CREDENTIAL_URL: ${AI_LARAVEL_CREDENTIAL_URL:?Provide an HTTPS Laravel credential endpoint reachable by FastAPI}
+      IFC_AI_ENABLED: ${IFC_AI_ENABLED:-false}
+      IFC_AI_TUTORIALS_ENABLED: ${IFC_AI_TUTORIALS_ENABLED:-true}
+      IFC_AI_MODEL: ${IFC_AI_MODEL:-gpt-5.4-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_REPLAY_REDIS_URL: ${AI_REPLAY_REDIS_URL:?Provide the encoded internal Redis URL for AI replay keys}
+      IFC_BILLING_LEGAL_ISSUANCE_VERIFIED: "false"
+    volumes:
+      - ifc_private_documents:/var/www/html/storage/app/private
+      - ${AI_TLS_CERT_DIR:?Mount the internal AI TLS certificate, key and CA}:/run/ai-tls:ro
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      ai: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "php-fpm", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  queue:
+    build:
+      context: .
+      dockerfile: docker/php-fpm.Dockerfile
+    command: ["php", "artisan", "queue:work", "redis", "--sleep=2", "--tries=3", "--timeout=90"]
+    environment: *app_environment
+    volumes:
+      - ifc_private_documents:/var/www/html/storage/app/private
+      - ${AI_TLS_CERT_DIR:?Mount the internal AI TLS certificate, key and CA}:/run/ai-tls:ro
+    depends_on:
+      app: { condition: service_healthy }
+    restart: unless-stopped
+
+  ai:
+    build:
+      context: ./python-ai
+      dockerfile: Dockerfile
+    environment:
+      APP_ENV: production
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?Provide the internal AI credential}
+      AI_REPLAY_REDIS_URL: ${AI_REPLAY_REDIS_URL:?Provide the encoded internal Redis URL for AI replay keys}
+      AI_LARAVEL_CREDENTIAL_URL: ${AI_LARAVEL_CREDENTIAL_URL:?Provide an HTTPS Laravel credential endpoint reachable by FastAPI}
+      AI_LARAVEL_CREDENTIAL_CA: /run/ai-tls/ca.pem
+    volumes:
+      - ${AI_TLS_CERT_DIR:?Mount the internal AI TLS certificate, key and CA}:/run/ai-tls:ro
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--ssl-certfile", "/run/ai-tls/fullchain.pem", "--ssl-keyfile", "/run/ai-tls/privkey.pem"]
+    depends_on:
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import ssl,urllib.request; urllib.request.urlopen('https://127.0.0.1:8000/health', context=ssl._create_unverified_context(), timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx.Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${TLS_CERT_DIR:?Mount approved TLS certificate directory}:/run/tls:ro
+    depends_on:
+      app: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider --no-check-certificate https://127.0.0.1/up || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:?Provide the database name}
+      MYSQL_USER: ${DB_USERNAME:?Provide the database user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Provide the database password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Provide a separate root password}
+    volumes:
+      - ifc_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Provide a Redis password}
+    volumes:
+      - ifc_redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  ifc_mysql:
+  ifc_redis:
+  ifc_private_documents:
